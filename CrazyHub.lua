@@ -50,7 +50,7 @@ local Window = Rayfield:CreateWindow({
 
  local Slider = Tab:CreateSlider({
     Name = "Dash Length",
-    Range = {10, 100},
+    Range = {10, 1000},
     Increment = 10,
     Suffix = "Length",
     CurrentValue = 10,
@@ -59,5 +59,19 @@ local Window = Rayfield:CreateWindow({
     -- The function that takes place when the slider changes
     -- The variable (Value) is a number which correlates to the value the slider is currently at
     game.Player.LocalPlayer.Character:SetAttribute("DashLength", Value)
+    end,
+ })
+
+ local Slider = Tab:CreateSlider({
+    Name = "Jump Height",
+    Range = {10, 500},
+    Increment = 1,
+    Suffix = "Length",
+    CurrentValue = 10,
+    Flag = "Slider2", -- A flag is the identifier for the configuration file, make sure every element has a different flag if you're using configuration saving to ensure no overlaps
+    Callback = function(Value)
+    -- The function that takes place when the slider changes
+    -- The variable (Value) is a number which correlates to the value the slider is currently at
+    game.Player.LocalPlayer.Character.Humanoid.JumpPower - Value
     end,
  })
