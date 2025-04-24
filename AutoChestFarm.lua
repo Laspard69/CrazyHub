@@ -1,19 +1,23 @@
-local Webhook = getgenv().Webhook or ""
+--✅ COMBINED: KeyLoader + Stealth AutoFarm + Webhook + PvP Safe + Fruit Storing
+
+local correctKey = "CRAZYHUB_rOB4u3DYObkWNZH3KQmpwCwIf7I"
+local keyURL = "https://direct-link.net/1292294/crazy-hub-key-system"
+getgenv().CrazyHub_Key = getgenv().CrazyHub_Key or ""
+getgenv().Webhook = getgenv().Webhook or "" -- You can set this externally too
+
 local Players = game:GetService("Players")
 local VirtualUser = game:GetService("VirtualUser")
 local HttpService = game:GetService("HttpService")
 local TeleportService = game:GetService("TeleportService")
+local TweenService = game:GetService("TweenService")
 local plr = Players.LocalPlayer
 
 local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/jensonhirst/Orion/main/source"))()
 local isRunning = false
-local tweenSpeed = 200
-local totalMoney = 0
-local guiLabel = nil
-local lastRollTime = 0
-
--- OPTIONAL: Hide player name from others (for advanced stealth)
-pcall(function() plr.Name = "Unknown" end)
+tweenSpeed = 200
+totalMoney = 0
+guiLabel = nil
+lastRollTime = 0
 
 -- Anti-AFK
 plr.Idled:Connect(function()
@@ -21,25 +25,25 @@ plr.Idled:Connect(function()
     VirtualUser:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
 end)
 
--- Webhook sender
+-- Webhook
 local function sendWebhook(title, content)
-    if Webhook == "" then return end
+    if getgenv().Webhook == "" then return end
     local data = {
         content = "@everyone",
         embeds = {{
             title = title,
             description = content,
             color = 65280,
-            footer = {text = "Crazy Hub AutoFarm"}
+            footer = {text = "Crazy Hub Stealth AutoFarm"}
         }}
     }
     local json = HttpService:JSONEncode(data)
     pcall(function()
-        HttpService:PostAsync(Webhook, json, Enum.HttpContentType.ApplicationJson)
+        HttpService:PostAsync(getgenv().Webhook, json, Enum.HttpContentType.ApplicationJson)
     end)
 end
 
--- GUI Money Counter (in PlayerGui)
+-- GUI
 local function createMoneyGUI()
     if guiLabel then guiLabel:Destroy() end
     local screenGui = Instance.new("ScreenGui", plr:WaitForChild("PlayerGui"))
@@ -57,12 +61,9 @@ end
 
 local function updateMoney(amount)
     totalMoney += amount
-    if guiLabel then
-        guiLabel.Text = "Money Earned: $" .. tostring(totalMoney)
-    end
+    if guiLabel then guiLabel.Text = "Money Earned: $" .. tostring(totalMoney) end
 end
 
--- PvP check (enemy detected = stop farm)
 local function isInCombat()
     for _, p in pairs(Players:GetPlayers()) do
         if p ~= plr and p.Team ~= plr.Team and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
@@ -73,12 +74,10 @@ local function isInCombat()
     return false
 end
 
--- Safe movement method
 local function safeMoveTo(part)
     local hum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
     if not hum or not part then return end
     hum:MoveTo(part.Position)
-
     local reached = false
     local timeout = 10
     local conn
@@ -86,15 +85,10 @@ local function safeMoveTo(part)
         reached = r
         conn:Disconnect()
     end)
-
     while not reached and timeout > 0 do
         timeout -= task.wait(0.2)
-        if hum.SeatPart then
-            hum.Sit = false
-            hum.Jump = true
-        end
+        if hum.SeatPart then hum.Sit = false hum.Jump = true end
     end
-
     if reached then
         firetouchinterest(plr.Character.HumanoidRootPart, part, 0)
         task.wait(0.1 + math.random())
@@ -102,24 +96,25 @@ local function safeMoveTo(part)
     end
 end
 
--- Main loop
+local function storeFruitToInventory(fruitName)
+    local success, err = pcall(function()
+        local remote = game:GetService("ReplicatedStorage"):FindFirstChild("Remotes"):FindFirstChild("CommF_")
+        if remote then
+            remote:InvokeServer("StoreFruit", fruitName)
+        end
+    end)
+    if success then
+        sendWebhook("Fruit Stored", "Stored fruit: **" .. fruitName .. "** in inventory.")
+    end
+end
+
 local function runAllFarms()
     createMoneyGUI()
     local hrp = plr.Character and plr.Character:WaitForChild("HumanoidRootPart")
     local emptyCycles = 0
 
     while isRunning do
-        if isInCombat() then
-            OrionLib:MakeNotification({
-                Name = "Combat Detected",
-                Content = "Pausing farm during PvP...",
-                Image = "rbxassetid://4483345998",
-                Time = 3
-            })
-            task.wait(5)
-            continue
-        end
-
+        if isInCombat() then OrionLib:MakeNotification({ Name = "Combat Detected", Content = "Pausing farm during PvP...", Image = "rbxassetid://4483345998", Time = 3 }) task.wait(5) continue end
         local foundChest = false
 
         for _, v in pairs(workspace:GetDescendants()) do
@@ -128,7 +123,7 @@ local function runAllFarms()
                 foundChest = true
                 safeMoveTo(v:FindFirstChildWhichIsA("MeshPart"))
                 updateMoney(1000)
-                task.wait(0.4 + math.random() * 0.2)
+                task.wait(0.3 + math.random())
             end
         end
 
@@ -139,6 +134,8 @@ local function runAllFarms()
                 local name = tool.Name:lower()
                 if name:find("chalice") or name:find("fist") or name:find("darkness") or name:find("fruit") then
                     sendWebhook("Item Collected", "**" .. tool.Name .. "** was collected.")
+                    task.wait(1.2)
+                    storeFruitToInventory(tool.Name)
                 end
                 task.wait(0.8)
             end
@@ -170,54 +167,45 @@ local function runAllFarms()
             TeleportService:Teleport(game.PlaceId, plr)
             return
         end
-
         task.wait(1)
     end
 end
 
--- GUI
 local function loadMainUI()
-    local MainWindow = OrionLib:MakeWindow({
-        Name = "Crazy Hub | Auto Farm",
-        HidePremium = false,
-        SaveConfig = true,
-        ConfigFolder = "CrazyHub"
-    })
-
-    local MainTab = MainWindow:MakeTab({
-        Name = "Main",
-        Icon = "rbxassetid://4483345998",
-        PremiumOnly = false
-    })
-
-    MainTab:AddSlider({
-        Name = "Tween Speed",
-        Min = 100,
-        Max = 300,
-        Default = tweenSpeed,
-        Increment = 25,
-        Callback = function(val)
-            tweenSpeed = math.min(val, 300)
-        end
-    })
-
-    MainTab:AddButton({
-        Name = "Start Safe Farming",
-        Callback = function()
-            if not isRunning then
-                isRunning = true
-                task.spawn(runAllFarms)
-            end
-        end
-    })
-
-    MainTab:AddButton({
-        Name = "Stop Farming",
-        Callback = function()
-            isRunning = false
-        end
-    })
+    local MainWindow = OrionLib:MakeWindow({ Name = "Crazy Hub | Stealth Farm", HidePremium = false, SaveConfig = true, ConfigFolder = "CrazyHubStealth" })
+    local MainTab = MainWindow:MakeTab({ Name = "Main", Icon = "rbxassetid://4483345998", PremiumOnly = false })
+    MainTab:AddSlider({ Name = "Tween Speed", Min = 100, Max = 300, Default = tweenSpeed, Increment = 25, Callback = function(val) tweenSpeed = math.min(val, 300) end })
+    MainTab:AddButton({ Name = "Start Safe Farming", Callback = function() if not isRunning then isRunning = true task.spawn(runAllFarms) end end })
+    MainTab:AddButton({ Name = "Stop Farming", Callback = function() isRunning = false end })
 end
 
-loadMainUI()
-OrionLib:Init()
+-- Key Check
+if getgenv().CrazyHub_Key == correctKey then
+    loadMainUI()
+    OrionLib:Init()
+else
+    local KeyWindow = OrionLib:MakeWindow({ Name = "Crazy Hub | Keysystem", HidePremium = false, SaveConfig = false, IntroEnabled = true, IntroText = "Loading.. Crazy Hub" })
+    local KeyTab = KeyWindow:MakeTab({ Name = "Enter Key", Icon = "rbxassetid://4483345998", PremiumOnly = false })
+    local userKey = ""
+    KeyTab:AddTextbox({ Name = "Enter Your Key", Default = "", TextDisappear = false, Callback = function(Value) userKey = Value end })
+    KeyTab:AddButton({ Name = "Submit Key", Callback = function()
+        if userKey == correctKey then
+            getgenv().CrazyHub_Key = userKey
+            OrionLib:MakeNotification({ Name = "Access Granted", Content = "Welcome to Crazy Hub!", Image = "rbxassetid://4483345998", Time = 5.0 })
+            task.delay(1, function()
+                OrionLib:Destroy()
+                wait(0.5)
+                OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/jensonhirst/Orion/main/source"))()
+                loadMainUI()
+                OrionLib:Init()
+            end)
+        else
+            OrionLib:MakeNotification({ Name = "Invalid Key", Content = "The key you entered is incorrect!", Image = "rbxassetid://4483345998", Time = 5.0 })
+        end
+    end })
+    KeyTab:AddButton({ Name = "Get Key", Callback = function()
+        setclipboard(keyURL)
+        OrionLib:MakeNotification({ Name = "Key Copied!", Content = "Link copied to clipboard. Paste it in your browser to get your key.", Image = "rbxassetid://4483345998", Time = 5.0 })
+    end })
+    OrionLib:Init()
+end
